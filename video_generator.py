@@ -70,15 +70,52 @@ _BADGE_COLOURS: dict[str, tuple] = {
 }
 
 # ── Font helpers ──────────────────────────────────────────────────────────────
-_FONT_DIR = "/usr/share/fonts/truetype/google-fonts"
-_FALL     = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-_FALL_B   = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+# Try Google Fonts first (Linux), then platform system fonts (mac/Windows),
+# then PIL's bundled default. The script works without Poppins/Liberation
+# installed — it just falls back to whatever sans-serif the OS provides.
+_FONT_DIRS = [
+    "/usr/share/fonts/truetype/google-fonts",         # Debian/Ubuntu fonts-google-* packages
+    "/usr/share/fonts/google-fonts",                  # Fedora/Arch variants
+    os.path.expanduser("~/Library/Fonts"),            # macOS user fonts
+    "/Library/Fonts",                                 # macOS system fonts
+]
+_SANS_REGULAR_CANDIDATES = [
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "C:/Windows/Fonts/arial.ttf",
+]
+_SANS_BOLD_CANDIDATES = [
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "C:/Windows/Fonts/arialbd.ttf",
+]
+
+def _first_existing(paths: list[str]) -> Optional[str]:
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return None
 
 def _font(name: str, size: int) -> ImageFont.FreeTypeFont:
-    try:
-        return ImageFont.truetype(os.path.join(_FONT_DIR, name), size)
-    except IOError:
-        return ImageFont.truetype(_FALL_B if "Bold" in name else _FALL, size)
+    for d in _FONT_DIRS:
+        candidate = os.path.join(d, name)
+        if os.path.exists(candidate):
+            try:
+                return ImageFont.truetype(candidate, size)
+            except IOError:
+                pass
+    fallback = _first_existing(_SANS_BOLD_CANDIDATES if "Bold" in name
+                               else _SANS_REGULAR_CANDIDATES)
+    if fallback:
+        try:
+            return ImageFont.truetype(fallback, size)
+        except IOError:
+            pass
+    return ImageFont.load_default()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -477,11 +514,17 @@ def mix_audio(video_path: str, music_path: str, output_path: str,
         f"afade=t=out:st={fade_st:.2f}:d={fade_s:.2f},"
         f"volume={volume}[aout]"
     )
+    # If the silent intermediate already encodes to an MP4-compatible codec
+    # (e.g. mp4v on Linux), copy the video stream — fast. Otherwise transcode
+    # to H.264 so the output mp4 plays everywhere.
+    same_container = output_path.lower().endswith(os.path.splitext(video_path)[1].lower())
+    video_args = (["-c:v", "copy"] if same_container
+                  else ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast"])
     cmd = ["ffmpeg", "-y", "-loglevel", "error",
            "-i", video_path, "-i", music_path,
            "-filter_complex", filt,
            "-map", "0:v", "-map", "[aout]",
-           "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+           *video_args, "-c:a", "aac", "-b:a", "128k",
            output_path]
     try:
         r = subprocess.run(cmd, capture_output=True, timeout=90)
@@ -884,15 +927,27 @@ def _fade(out, a: np.ndarray, b: np.ndarray, n: int) -> None:
         out.write(np.clip((1-alpha)*af + alpha*bf, 0, 255).astype(np.uint8))
 
 
-def generate_video(config: dict, output_path: str, config_dir: Path) -> float:
+def generate_video(config: dict, output_path: str, config_dir: Path) -> tuple[float, str]:
     conf      = config.get("conference", {})
     pres_list = config.get("presentations", [])
     group     = config.get("group", {})
     qr_url    = config.get("qr_url", group.get("website",""))
     theme     = load_theme(config, config_dir)
 
+    # Try mp4v first (Linux + many OpenCV builds), fall back to MJPG/AVI
+    # (universally available, works on macOS where mp4v is often missing).
+    # ffmpeg transcodes to clean H.264 mp4 in the audio-mix pass below.
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out    = cv2.VideoWriter(output_path, fourcc, FPS, (WIDTH, HEIGHT))
+    if not out.isOpened():
+        avi_path = os.path.splitext(output_path)[0] + ".avi"
+        out = cv2.VideoWriter(avi_path, cv2.VideoWriter_fourcc(*"MJPG"),
+                              FPS, (WIDTH, HEIGHT))
+        if out.isOpened():
+            output_path = avi_path
+        else:
+            sys.exit("ERROR: OpenCV cannot open any video writer (tried mp4v + MJPG). "
+                     "Install ffmpeg or a fuller OpenCV build (`pip install opencv-contrib-python`).")
     total_frames = 0
 
     # Intro
@@ -948,7 +1003,7 @@ def generate_video(config: dict, output_path: str, config_dir: Path) -> float:
     out.release()
     duration_s = total_frames / FPS
     print(f"  ✓ Silent video → {output_path}  ({duration_s:.1f} s)")
-    return duration_s
+    return duration_s, output_path
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -979,8 +1034,8 @@ def main():
         music_path = str(config_dir/"assets"/"music"/"background.wav")
 
     print("\n─── Rendering video ────────────────────────────────")
-    silent = str(output_path).replace(".mp4","_silent.mp4")
-    duration_s = generate_video(config, silent, config_dir)
+    silent_request = str(output_path).replace(".mp4","_silent.mp4")
+    duration_s, silent = generate_video(config, silent_request, config_dir)
 
     # (Re)generate music if using the auto path
     if music_path == str(config_dir/"assets"/"music"/"background.wav"):
