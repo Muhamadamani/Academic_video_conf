@@ -12,7 +12,8 @@ Slide layout (matches reference screenshot):
   • Bottom    : caption text + funding logos / badges
   • Intro     : conference name, acronym, date
   • Outro     : group name, PI, members, QR code
-  • Music     : smooth house/lofi beat auto-generated; replace freely
+  • Music     : procedural backing track auto-generated; pick "house"
+                or "jazz" via config.json["music"]["style"]. Replace freely.
 
 All colours, the background, and text colours are configurable via
 the "theme" block in config.json.
@@ -285,6 +286,183 @@ def generate_house_music(duration_s: float, output_path: str,
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# Peaceful jazz with a touch of techno
+# ════════════════════════════════════════════════════════════════════════════════
+
+def generate_jazz_techno_music(duration_s: float, output_path: str,
+                               sample_rate: int = 44100, bpm: int = 88) -> None:
+    """
+    Peaceful jazz vamp with a subtle 4-on-the-floor techno pulse underneath.
+    Mono WAV. Progression: Dm7 → G7 → Cmaj7 → Am7 (2 bars each), walking
+    upright bass, brushed drums, warm maj7/9 pad, sparse sax-like lead.
+    """
+    n       = int(sample_rate * duration_s)
+    audio   = np.zeros(n, dtype=np.float32)
+    beat_n  = int(sample_rate * 60.0 / bpm)
+    bar_n   = 4 * beat_n
+    chord_n = 2 * bar_n            # two bars per chord
+    s16     = beat_n // 4
+    rng     = np.random.default_rng(7)
+
+    # ── Drum voices (softer than the house kit) ────────────────────────────────
+
+    def soft_kick(dur_s=0.20):
+        d = int(dur_s * sample_rate)
+        t = np.arange(d, dtype=np.float32) / sample_rate
+        freq = 110 * np.exp(-t * 30) + 50
+        amp  = np.exp(-t * 12)
+        phase = np.cumsum(2 * np.pi * freq / sample_rate)
+        return 0.32 * np.sin(phase) * amp
+
+    def brushed(dur_s=0.18):
+        d = int(dur_s * sample_rate)
+        t = np.arange(d, dtype=np.float32) / sample_rate
+        noise = rng.standard_normal(d).astype(np.float32)
+        noise[1:] -= 0.6 * noise[:-1]                # gentle highpass
+        amp = np.exp(-t * 14) * (1 - np.exp(-t * 60))
+        return 0.18 * noise * amp
+
+    def shaker(dur_s=0.06):
+        d = int(dur_s * sample_rate)
+        t = np.arange(d, dtype=np.float32) / sample_rate
+        noise = rng.standard_normal(d).astype(np.float32)
+        noise[1:] -= 0.92 * noise[:-1]
+        amp = np.exp(-t * 50)
+        return 0.07 * noise * amp
+
+    kick_buf  = soft_kick()
+    brush_buf = brushed()
+    shak_buf  = shaker()
+
+    def place(buf, pos):
+        end = min(pos + len(buf), n)
+        if pos < n:
+            audio[pos:end] += buf[:end - pos]
+
+    kick_pat  = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0]   # quiet 4-on-the-floor (the techno pulse)
+    brush_pat = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]   # snare on 2 & 4
+    shak_pat  = [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]   # offbeat 8ths
+
+    for bar_start in range(0, n, bar_n):
+        for i in range(16):
+            pos = bar_start + i * s16
+            if kick_pat[i]:  place(kick_buf,  pos)
+            if brush_pat[i]: place(brush_buf, pos)
+            if shak_pat[i]:  place(shak_buf,  pos)
+
+    # ── Chord progression: Dm7 → G7 → Cmaj7 → Am7 ─────────────────────────────
+    # Each tuple: (pad_voicing_hz, walking_bass_4_notes_per_bar_hz)
+    chord_cycle = [
+        ([293.66, 349.23, 440.00, 523.25],   # Dm7  : D4 F4 A4 C5
+         [73.42, 110.00, 87.31, 73.42]),     # walk : D2 A2 F2 D2
+        ([196.00, 246.94, 293.66, 349.23],   # G7   : G3 B3 D4 F4
+         [98.00, 123.47, 73.42, 98.00]),     # walk : G2 B2 D2 G2
+        ([261.63, 329.63, 392.00, 493.88],   # Cmaj7: C4 E4 G4 B4
+         [65.41,  98.00,  82.41, 65.41]),    # walk : C2 G2 E2 C2
+        ([220.00, 261.63, 329.63, 392.00],   # Am7  : A3 C4 E4 G4
+         [55.00,  82.41,  65.41, 55.00]),    # walk : A1 E2 C2 A1
+    ]
+
+    for ci, chord_start in enumerate(range(0, n, chord_n)):
+        notes, walk = chord_cycle[ci % len(chord_cycle)]
+        chord_dur   = min(chord_n, n - chord_start)
+
+        # Pad
+        ct   = np.arange(chord_dur, dtype=np.float32) / sample_rate
+        fade = min(int(0.6 * sample_rate), chord_dur // 4)
+        env  = np.ones(chord_dur, dtype=np.float32)
+        if fade > 0:
+            env[:fade]  = np.linspace(0.0, 1.0, fade)
+            env[-fade:] = np.linspace(1.0, 0.0, fade)
+        pad = np.zeros(chord_dur, dtype=np.float32)
+        for note in notes:
+            vib = 1.0 + 0.0014 * np.sin(2*np.pi * 4.7 * ct)
+            pad += 0.045 * np.sin(2*np.pi * note       * vib * ct)
+            pad += 0.012 * np.sin(2*np.pi * note * 2   * vib * ct)
+            pad += 0.006 * np.sin(2*np.pi * note * 0.5 * vib * ct)
+        audio[chord_start:chord_start + chord_dur] += (pad * env).astype(np.float32)
+
+        # Walking bass — one note per beat over 2 bars (reuses the 4-note pattern)
+        for bar in range(2):
+            for beat in range(4):
+                pos = chord_start + bar * bar_n + beat * beat_n
+                if pos >= n:
+                    break
+                freq = walk[beat]
+                dur  = int(beat_n * 0.78)
+                end  = min(pos + dur, n)
+                bt   = np.arange(end - pos, dtype=np.float32) / sample_rate
+                osc  = (0.65 * np.sin(2*np.pi * freq         * bt) +
+                        0.22 * np.sin(2*np.pi * freq * 1.005 * bt) +
+                        0.13 * np.sin(2*np.pi * freq * 2     * bt))
+                amp  = np.exp(-bt * 4.0) * (1 - np.exp(-bt * 50))
+                audio[pos:end] += (0.42 * osc * amp).astype(np.float32)
+
+    # ── Sparse sax-like lead (skips every 4th chord for breathing room) ───────
+    lead_seq = [
+        # (offset_in_beats, freq_hz, duration_in_beats, velocity)
+        (0.5, 587.33, 1.5, 0.70),   # D5
+        (3.0, 523.25, 1.0, 0.60),   # C5
+        (5.5, 440.00, 1.5, 0.65),   # A4
+    ]
+    for ci, chord_start in enumerate(range(0, n, chord_n)):
+        if ci % 4 == 3:
+            continue
+        for off_b, freq, dur_b, vel in lead_seq:
+            pos = chord_start + int(off_b * beat_n)
+            if pos >= n:
+                break
+            dur = int(dur_b * beat_n)
+            end = min(pos + dur, n)
+            lt  = np.arange(end - pos, dtype=np.float32) / sample_rate
+            vib = 1.0 + 0.004 * np.sin(2*np.pi * 5.5 * lt)
+            osc = (0.55 * np.sin(2*np.pi * freq     * vib * lt) +
+                   0.20 * np.sin(2*np.pi * freq * 2 * vib * lt) +
+                   0.10 * np.sin(2*np.pi * freq * 3 * vib * lt))
+            atk = min(int(0.08 * sample_rate), max(1, len(lt) // 4))
+            rel = min(int(0.30 * sample_rate), max(1, len(lt) // 3))
+            amp = np.ones(len(lt), dtype=np.float32)
+            amp[:atk]  = np.linspace(0.0, 1.0, atk)
+            amp[-rel:] = np.linspace(1.0, 0.0, rel)
+            audio[pos:end] += (vel * 0.16 * osc * amp).astype(np.float32)
+
+    # ── Master fade & normalise ────────────────────────────────────────────────
+    fade_n = int(min(2.0, duration_s * 0.06) * sample_rate)
+    if fade_n > 0:
+        audio[:fade_n]  *= np.linspace(0.0, 1.0, fade_n)
+        audio[-fade_n:] *= np.linspace(1.0, 0.0, fade_n)
+    mx = np.max(np.abs(audio))
+    if mx > 0:
+        audio *= 0.75 / mx
+
+    pcm = (audio * 32767).clip(-32768, 32767).astype(np.int16)
+    with wave.open(output_path, "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm.tobytes())
+    print(f"  ♪ Jazz-techno track generated → {output_path}")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Music style dispatcher
+# ════════════════════════════════════════════════════════════════════════════════
+
+def generate_music(style: str, duration_s: float, output_path: str) -> None:
+    """Generate a procedural backing track in the requested style.
+
+    Both styles are 100% original — synthesised from sine waves and noise
+    in this script — so the output is free to use, modify, and redistribute
+    under the project's MIT license. No third-party licensing required.
+    """
+    key = (style or "house").strip().lower().replace("-", "_").replace(" ", "_")
+    if key in ("jazz", "jazz_techno", "peaceful", "peaceful_jazz"):
+        generate_jazz_techno_music(duration_s, output_path)
+    else:
+        generate_house_music(duration_s, output_path)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # Audio mixing (ffmpeg)
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -356,9 +534,14 @@ def create_asset_folders(config: dict, config_dir: Path) -> None:
         "Background music\n"
         "=================\n"
         "Drop any WAV, MP3, AAC, OGG or FLAC here.\n"
-        "The script picks the first audio file it finds.\n"
-        "Leave the folder empty to auto-generate a house/lofi beat.\n\n"
-        "CC-licensed music sources:\n"
+        "The script picks the first audio file it finds.\n\n"
+        "Leave the folder empty to auto-generate a track. Pick a style in\n"
+        "config.json:\n"
+        '  "music": { "style": "house" }   ← driving house/techno (default)\n'
+        '  "music": { "style": "jazz"  }   ← peaceful jazz with a techno pulse\n\n'
+        "Both auto-generated styles are synthesised from scratch in this\n"
+        "script — 100% original audio, MIT-licensed, free to use anywhere.\n\n"
+        "Other CC-licensed music sources, if you want something custom:\n"
         "  freemusicarchive.org  ccmixter.org  freesound.org\n")
     _write_if_new(config_dir / "assets" / "sponsors" / "README.txt",
         "Sponsor logo images\n"
@@ -801,7 +984,8 @@ def main():
 
     # (Re)generate music if using the auto path
     if music_path == str(config_dir/"assets"/"music"/"background.wav"):
-        generate_house_music(duration_s + 2, music_path)
+        style = music_cfg.get("style", "house")
+        generate_music(style, duration_s + 2, music_path)
 
     print("\n─── Mixing audio ───────────────────────────────────")
     volume = float(music_cfg.get("volume", 0.22))

@@ -130,6 +130,7 @@ If a presenter is missing files, the script tells you which folder is empty and 
 | Wrong folder name for a presenter | Add `"folder": "custom_name"` inside `"presenter": {...}` |
 | Want a different colour scheme | Add `"theme": {"accent_color": "#FF5722"}` — see README.md for full options |
 | Music too loud / quiet | Edit `"music": {"volume": 0.22}` (0 = silent, 1 = max) |
+| Want a different vibe | Edit `"music": {"style": "house"}` → `"jazz"` for peaceful jazz with a subtle techno pulse. Both are generated in-script, no licensing concerns. |
 | Need 1080p instead of 720p | Edit `WIDTH, HEIGHT = 1920, 1080` at the top of `video_generator.py` |
 
 For anything deeper (custom layouts, batch runs, theming details), see [README.md](README.md).

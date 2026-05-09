@@ -5,8 +5,9 @@
 
   "music": {
     "path": "",
+    "style": "house",
     "volume": 0.22,
-    "_note": "Leave 'path' empty to auto-generate ambient music. Or drop any WAV/MP3 in assets/music/ and point here."
+    "_note": "style = 'house' (driving house/techno) or 'jazz' (peaceful jazz with a subtle techno pulse). Both are synthesised in-script and free to use. Set 'path' to override with your own WAV/MP3."
   },
 
   "theme": {

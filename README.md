@@ -19,7 +19,7 @@ Automatically assembles a polished MP4 highlight reel for your research group's 
 | **Per presenter** | Paper title + authors · project video (left) · headshot photo (right) · caption · sponsor logos |
 | **Outro** | Group name, PI, members, QR code, "Thank you" |
 
-Background music is mixed in automatically (house/lofi beat generated if no file is provided).  
+Background music is mixed in automatically — pick `"house"` (driving house/techno) or `"jazz"` (peaceful jazz with a subtle techno pulse) in `config.json`, or drop your own track in `assets/music/`.  
 Cross-fades connect every slide.
 
 ---
@@ -292,8 +292,21 @@ Pre-coloured badges are built in for: `NSF`, `NIH`, `DARPA`, `DOE`, `NASA`, `NSE
 
 ## Background music
 
-- On first run the script generates a **house/lofi beat** (`assets/music/background.wav`) with kick, snare, hi-hats, Am7 bass and chord pad at 110 BPM.
-- Replace it with any royalty-free track — the script picks the first audio file it finds in `assets/music/`.
+Two procedural styles ship in the script — both synthesised from sine waves and noise, so the output is **100% original audio, MIT-licensed, free to use anywhere**:
+
+| `"style"` | Sound |
+|---|---|
+| `"house"` *(default)* | Driving house/techno: 4-on-the-floor kick, snare on 2 & 4, syncopated Am7 bass, chord pad. 110 BPM. |
+| `"jazz"` | Peaceful jazz with a subtle techno pulse: brushed drums + quiet kick, walking upright bass, warm maj7/9 pad, sparse sax-like lead. Dm7 → G7 → Cmaj7 → Am7 vamp at 88 BPM. |
+
+Set the style in `config.json`:
+
+```json
+"music": { "style": "jazz", "volume": 0.22 }
+```
+
+- The track is regenerated each run to match the video length.
+- To use your own track, drop any WAV/MP3 in `assets/music/` (the script picks the first audio file it finds) or set `"music": {"path": "assets/music/mytrack.mp3"}`.
 - Volume is controlled by `"volume"` in `config.json` (default `0.22`, i.e. quiet background).
 
 Good sources of CC-licensed music:
