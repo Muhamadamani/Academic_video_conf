@@ -1,0 +1,80 @@
+{
+  "_disclaimer": "All names, titles, and institutions below are fictional placeholders. Replace with your real group data.",
+
+  "qr_url": "https://your-lab-website.example.edu",
+
+  "music": {
+    "path": "",
+    "volume": 0.22,
+    "_note": "Leave 'path' empty to auto-generate ambient music. Or drop any WAV/MP3 in assets/music/ and point here."
+  },
+
+  "theme": {
+    "_note": "All theme fields are optional — remove this whole block to keep the default black/gold look.",
+    "background_color": "#000000",
+    "background_image": "",
+    "accent_color":     "#FFB800",
+    "title_color":      "#FFFFFF",
+    "text_color":       "#C8CDD7",
+    "secondary_color":  "#6E7684"
+  },
+
+  "conference": {
+    "name": "International Symposium on Quantum Banana Computing",
+    "acronym": "QBANANA 2025",
+    "date": "April 1–3, 2025  •  The Moon, Crater 42",
+    "duration": 5
+  },
+
+  "presentations": [
+    {
+      "title": "Harnessing Spaghetti Topology for Faster-Than-Light Noodle Routing",
+      "authors": "A. Bytes, R. Overflow, N. Ullpointer et al.",
+      "caption": "Results show 300% speedup when carbohydrates are involved",
+      "duration": 5,
+      "presenter": {
+        "name": "Ada Bytes",
+        "role": "phd"
+      },
+      "funding_logos": ["NSF", "NIH", "DARPA"]
+    },
+    {
+      "title": "Deep Reinforcement Learning for Competitive Duck Herding",
+      "authors": "R. Overflow, B. Segfault, H. Elperme",
+      "caption": "Agent achieves superhuman duck-per-second throughput after 72 h of training",
+      "duration": 5,
+      "presenter": {
+        "name": "Roberto Overflow",
+        "role": "postdoc"
+      },
+      "funding_logos": ["DOE", "OXFORD"]
+    },
+    {
+      "title": "Zero-Shot Transfer of Interpretable Meme Embeddings to Cheese Classification",
+      "authors": "N. Ullpointer, A. Bytes, C. Stacktrace",
+      "caption": "GOUDA-BERT outperforms humans on the Swiss Cheese Benchmark (SCB-21)",
+      "duration": 5,
+      "presenter": {
+        "name": "Null Pointer",
+        "role": "phd"
+      },
+      "funding_logos": ["ERC", "EU", "NSF"]
+    }
+  ],
+
+  "group": {
+    "name": "League of Extraordinary Nerds Lab",
+    "pi": "Prof. Heisenberg Undefined, Ph.D.",
+    "members": [
+      "Ada Bytes (Ph.D.)",
+      "Roberto Overflow (Postdoc)",
+      "Null Pointer (Ph.D.)",
+      "Brenda Segfault (Ph.D.)",
+      "Hans Elperme (Postdoc)",
+      "Chuck Stacktrace (Ph.D.)",
+      "Wanda Kernel (Ph.D.)"
+    ],
+    "website": "https://loen-lab.example.edu",
+    "duration": 8
+  }
+}
